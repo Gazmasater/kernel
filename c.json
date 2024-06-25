@@ -5,8 +5,8 @@
         "includePath": [
             "${workspaceFolder}/**",
             
-            "/usr/include/linux"
-            
+          
+            "/lib/modules/6.5.0-41-generic/build"
             
         ],
         "defines": [],
