@@ -2,7 +2,6 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 
-
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Your Name");
 MODULE_DESCRIPTION("A simple Linux kernel module");
@@ -11,6 +10,8 @@ MODULE_VERSION("0.1");
 static int __init hello_init(void)
 {
     printk(KERN_INFO "Hello, World!\n");
+    printk("Hello, World!\n");
+
     return 0;
 }
 

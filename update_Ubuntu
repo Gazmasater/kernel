@@ -1,0 +1,19 @@
+// текущие пакеты обновлены
+
+sudo apt update
+        sudo apt upgrade
+            sudo apt dist -
+    upgrade
+
+        // удаление ненужных пакетов
+
+        sudo apt autoremove
+
+            // пакет для выполнения обновления
+            sudo apt install update -
+    manager - core
+
+                  // обновление до следующей версии LTS
+
+                  sudo do -
+    release - upgrade - d

@@ -1,20 +1,21 @@
 {
-"configurations": [
-    {
-        "name": "Linux",
-        "includePath": [
-            "${workspaceFolder}/**",
-            
-          
-            "/lib/modules/6.5.0-41-generic/build"
-            
-        ],
-        "defines": [],
-        "compilerPath": "/usr/bin/gcc",
-        "cStandard": "c11",
-        "cppStandard": "c++17",
-        "intelliSenseMode": "linux-gcc-x64"
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                
+                "/usr/include",
+                "/usr/local/include"
+
+                
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
     }
-],
-"version": 4
-}
