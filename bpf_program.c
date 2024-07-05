@@ -1,4 +1,3 @@
-// bpf
 #include <linux/bpf.h>
 #define SEC(NAME) __attribute__((section(NAME), used))
 SEC("tracepoint/syscalls/sys_enter_execve")
