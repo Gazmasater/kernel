@@ -6,8 +6,8 @@
 SEC("tracepoint/syscalls/sys_enter_execve")
 int bpf_prog(void *ctx)
 {
-    char msg[] = "Hello, BPF World!";
-    bpf_printk("%s\n", msg);
+    
+    bpf_printk("Hello, BPF World!\n");
     return 0;
 }
 
