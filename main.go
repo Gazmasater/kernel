@@ -15,40 +15,40 @@ import (
 )
 
 func main() {
-	// Load BPF program from object file
+	// Загружаем BPF программу из файла
 	obj, err := ebpf.LoadCollection("bpf/bpf_program.bpf.o")
 	if err != nil {
 		log.Fatalf("failed to load BPF collection: %v", err)
 	}
 	defer obj.Close()
 
-	// Get the program
-	prog, ok := obj.Programs["bpf_prog"] // Ensure this matches your function name
+	// Получаем указатель на программу
+	prog, ok := obj.Programs["bpf_prog"]
 	if !ok {
 		log.Fatalf("program bpf_prog not found")
 	}
 
-	// Get the PERF_EVENT_ARRAY map
-	perfMap, ok := obj.Maps["perf_map"] // Ensure this matches your map name
-	if !ok {
-		log.Fatalf("perf_map not found")
-	}
-
-	// Attach program to tracepoint
+	// Прикрепляем программу к tracepoint
 	tracepoint, err := link.Tracepoint("syscalls", "sys_enter_execve", prog, nil)
 	if err != nil {
 		log.Fatalf("failed to attach program to tracepoint: %v", err)
 	}
 	defer tracepoint.Close()
 
-	// Create a new perf reader
+	// Получаем карту perf_map
+	perfMap, ok := obj.Maps["perf_map"]
+	if !ok {
+		log.Fatalf("perf_map not found")
+	}
+
+	// Создаем новый perf буфер для чтения событий
 	reader, err := perf.NewReader(perfMap, os.Getpagesize())
 	if err != nil {
 		log.Fatalf("failed to create perf reader: %v", err)
 	}
 	defer reader.Close()
 
-	// Signal handling for graceful shutdown
+	// Обработка сигналов для завершения программы
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 
@@ -56,29 +56,24 @@ func main() {
 
 	go func() {
 		for {
-			// Read events from the perf buffer
+			// Читаем события из perf буфера
 			record, err := reader.Read()
 			if err != nil {
 				log.Printf("failed to read event: %v", err)
 				continue
 			}
 
-			// Process the event
+			// Обрабатываем событие
 			var data struct {
-				Message [64]byte
+				PID  uint32
+				Comm [16]byte
 			}
+			binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &data)
 
-			// Use bytes.NewReader to wrap record.RawSample
-			err = binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &data)
-			if err != nil {
-				log.Printf("failed to decode event data: %v", err)
-				continue
-			}
-
-			fmt.Printf("Received event: %s\n", data.Message)
+			fmt.Printf("Received event: PID: %d, Comm: %s\n", data.PID, string(data.Comm[:]))
 		}
 	}()
 
-	<-c // Wait for termination
+	<-c // Ждем завершения
 	fmt.Println("Exiting...")
 }
