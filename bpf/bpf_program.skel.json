@@ -1,0 +1,1 @@
+{"bpf_skel":{"data_sections":[],"maps":[{"ident":"my_map","name":"my_map"},{"ident":"perf_map","name":"perf_map"},{"ident":"rodata_str1_1","name":".rodata.str1.1"},{"ident":"rodata","name":"bpf_prog.rodata"}],"obj_name":"bpf_program_bpf","progs":[{"attach":"tracepoint/syscalls/sys_enter_execve","link":true,"name":"bpf_prog"}]},"eunomia_version":"0.3.4"}
