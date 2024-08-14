@@ -22,18 +22,30 @@ func main() {
 	}
 	defer obj.Close()
 
-	// Получаем указатель на программу
-	prog, ok := obj.Programs["bpf_prog"]
+	// Получаем указатель на программу для начала
+	progStart, ok := obj.Programs["bpf_prog_start"]
 	if !ok {
-		log.Fatalf("program bpf_prog not found")
+		log.Fatalf("program bpf_prog_start not found")
 	}
 
-	// Прикрепляем программу к tracepoint
-	tracepoint, err := link.Tracepoint("syscalls", "sys_enter_execve", prog, nil)
-	if err != nil {
-		log.Fatalf("failed to attach program to tracepoint: %v", err)
+	// Получаем указатель на программу для окончания
+	progEnd, ok := obj.Programs["bpf_prog_end"]
+	if !ok {
+		log.Fatalf("program bpf_prog_end not found")
 	}
-	defer tracepoint.Close()
+
+	// Прикрепляем программы к tracepoint
+	tracepointStart, err := link.Tracepoint("syscalls", "sys_enter_execve", progStart, nil)
+	if err != nil {
+		log.Fatalf("failed to attach start program to tracepoint: %v", err)
+	}
+	defer tracepointStart.Close()
+
+	tracepointEnd, err := link.Tracepoint("syscalls", "sys_exit_execve", progEnd, nil)
+	if err != nil {
+		log.Fatalf("failed to attach end program to tracepoint: %v", err)
+	}
+	defer tracepointEnd.Close()
 
 	// Получаем карту perf_map
 	perfMap, ok := obj.Maps["perf_map"]
@@ -65,12 +77,21 @@ func main() {
 
 			// Обрабатываем событие
 			var data struct {
-				PID  uint32
-				Comm [16]byte
+				PID       uint32
+				Comm      [16]byte
+				StartTime uint64
+				EndTime   uint64
 			}
 			binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &data)
 
-			fmt.Printf("Received event: PID: %d, Comm: %s\n", data.PID, string(data.Comm[:]))
+			// Отображаем начало и конец события
+			if data.EndTime != 0 {
+				fmt.Printf("End event: PID: %d, Comm: %s, Start: %d ns, End: %d ns\n",
+					data.PID, string(data.Comm[:]), data.StartTime, data.EndTime)
+			} else {
+				fmt.Printf("Start event: PID: %d, Comm: %s, Start: %d ns\n",
+					data.PID, string(data.Comm[:]), data.StartTime)
+			}
 		}
 	}()
 

@@ -1,1 +1,1 @@
-{"bpf_skel":{"data_sections":[],"maps":[{"ident":"perf_map","name":"perf_map"}],"obj_name":"bpf_program_bpf","progs":[{"attach":"tracepoint/syscalls/sys_enter_execve","link":true,"name":"bpf_prog"}]},"eunomia_version":"0.3.4"}
+{"bpf_skel":{"data_sections":[],"maps":[{"ident":"perf_map","name":"perf_map"}],"obj_name":"bpf_program_bpf","progs":[{"attach":"tracepoint/syscalls/sys_enter_execve","link":true,"name":"bpf_prog_start"},{"attach":"tracepoint/syscalls/sys_exit_execve","link":true,"name":"bpf_prog_end"}]},"eunomia_version":"0.3.4"}
