@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,87 +15,83 @@ import (
 	"github.com/cilium/ebpf/perf"
 )
 
+const bpfProgramFile = "bpf/bpf_program.bpf.o"
+
 func main() {
-	// Загружаем BPF программу из файла
-	obj, err := ebpf.LoadCollection("bpf/bpf_program.bpf.o")
+	// Загружаем eBPF программу
+	spec, err := ebpf.LoadCollectionSpec(bpfProgramFile)
 	if err != nil {
-		log.Fatalf("failed to load BPF collection: %v", err)
-	}
-	defer obj.Close()
-
-	// Получаем указатель на программу для начала
-	progStart, ok := obj.Programs["bpf_prog_start"]
-	if !ok {
-		log.Fatalf("program bpf_prog_start not found")
+		log.Fatalf("Ошибка загрузки eBPF программы: %v", err)
 	}
 
-	// Получаем указатель на программу для окончания
-	progEnd, ok := obj.Programs["bpf_prog_end"]
-	if !ok {
-		log.Fatalf("program bpf_prog_end not found")
-	}
-
-	// Прикрепляем программы к tracepoint
-	tracepointStart, err := link.Tracepoint("syscalls", "sys_enter_execve", progStart, nil)
+	// Создаём экземпляр eBPF программы
+	coll, err := ebpf.NewCollection(spec)
 	if err != nil {
-		log.Fatalf("failed to attach start program to tracepoint: %v", err)
+		log.Fatalf("Ошибка создания коллекции eBPF: %v", err)
 	}
-	defer tracepointStart.Close()
+	defer coll.Close()
 
-	tracepointEnd, err := link.Tracepoint("syscalls", "sys_exit_execve", progEnd, nil)
+	// Получаем ссылку на eBPF программу
+	prog := coll.Programs["xdp_prog"]
+	if prog == nil {
+		log.Fatalf("Не удалось найти программу 'xdp_prog' в eBPF объекте")
+	}
+
+	// Прикрепляем программу к сетевому интерфейсу (например, eth0)
+	iface := "eth0"
+	l, err := link.AttachXDP(link.XDPOptions{
+		Program:   prog,
+		Interface: ifaceIndex(iface),
+		Flags:     link.XDPGenericMode,
+	})
 	if err != nil {
-		log.Fatalf("failed to attach end program to tracepoint: %v", err)
+		log.Fatalf("Ошибка прикрепления eBPF программы: %v", err)
 	}
-	defer tracepointEnd.Close()
+	defer l.Close()
 
-	// Получаем карту perf_map
-	perfMap, ok := obj.Maps["perf_map"]
-	if !ok {
-		log.Fatalf("perf_map not found")
-	}
+	fmt.Printf("eBPF программа прикреплена к интерфейсу %s\n", iface)
 
-	// Создаем новый perf буфер для чтения событий
-	reader, err := perf.NewReader(perfMap, os.Getpagesize())
+	// Чтение сообщений, отправленных с помощью bpf_printk
+	rd, err := perf.NewReader(coll.Maps["events"], os.Getpagesize())
 	if err != nil {
-		log.Fatalf("failed to create perf reader: %v", err)
+		log.Fatalf("Ошибка создания perf reader: %v", err)
 	}
-	defer reader.Close()
-
-	// Обработка сигналов для завершения программы
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-
-	fmt.Println("Listening for events...")
+	defer rd.Close()
 
 	go func() {
 		for {
-			// Читаем события из perf буфера
-			record, err := reader.Read()
+			record, err := rd.Read()
 			if err != nil {
-				log.Printf("failed to read event: %v", err)
+				log.Fatalf("Ошибка чтения perf событий: %v", err)
+			}
+
+			if record.LostSamples != 0 {
+				fmt.Printf("Потеряно %d событий\n", record.LostSamples)
 				continue
 			}
 
-			// Обрабатываем событие
-			var data struct {
-				PID       uint32
-				Comm      [16]byte
-				StartTime uint64
-				EndTime   uint64
+			var msg string
+			if err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &msg); err != nil {
+				log.Fatalf("Ошибка преобразования данных perf события: %v", err)
 			}
-			binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &data)
 
-			// Отображаем начало и конец события
-			if data.EndTime != 0 {
-				fmt.Printf("End event: PID: %d, Comm: %s, Start: %d ns, End: %d ns\n",
-					data.PID, string(data.Comm[:]), data.StartTime, data.EndTime)
-			} else {
-				fmt.Printf("Start event: PID: %d, Comm: %s, Start: %d ns\n",
-					data.PID, string(data.Comm[:]), data.StartTime)
-			}
+			fmt.Printf("Сообщение от eBPF программы: %s\n", msg)
 		}
 	}()
 
-	<-c // Ждем завершения
-	fmt.Println("Exiting...")
+	// Ожидание сигнала завершения
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	<-sig
+
+	fmt.Println("Завершаем программу...")
+}
+
+// ifaceIndex получает индекс сетевого интерфейса по его имени.
+func ifaceIndex(name string) int {
+	iface, err := net.InterfaceByName(name)
+	if err != nil {
+		log.Fatalf("Ошибка получения индекса интерфейса %s: %v", name, err)
+	}
+	return iface.Index
 }

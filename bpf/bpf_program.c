@@ -1,59 +1,43 @@
 #include <linux/bpf.h>
+#include <linux/if_ether.h>
+#include <linux/ip.h>
+#include <linux/udp.h>
 #include <bpf/bpf_helpers.h>
-#include <linux/ptrace.h>
 
-typedef int u32;
-typedef __u64 u64;
+#define IPPROTO_UDP 17
 
-// Определяем карту типа PERF_EVENT_ARRAY
-struct {
-    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-    __uint(max_entries, 0); // Замените на количество CPU или более
-} perf_map SEC(".maps");
+SEC("xdp")
+int xdp_prog(struct xdp_md *ctx) {
+    void *data = (void *)(long)ctx->data;
+    void *data_end = (void *)(long)ctx->data_end;
+   
+    struct ethhdr *eth = data;
+    if ((void *)(eth + 1) > data_end)
+        return XDP_DROP;
 
-struct data_t {
-    u32 pid; // PID процесса
-    char comm[16]; // Имя процесса
-    u64 start_time; // Время начала
-    u64 end_time; // Время окончания
-};
+    if (eth->h_proto != __constant_htons(ETH_P_IP))
+        return XDP_PASS;
 
-SEC("tracepoint/syscalls/sys_enter_execve")
-int bpf_prog_start(struct pt_regs *ctx) {
-    struct data_t data = {};
+    struct iphdr *ip = (void *)(eth + 1);
+    if ((void *)(ip + 1) > data_end)
+        return XDP_DROP;
 
-    // Получаем PID и имя процесса
-    data.pid = bpf_get_current_pid_tgid() >> 32;
-    bpf_get_current_comm(data.comm, sizeof(data.comm));
+    if (ip->protocol != IPPROTO_UDP)
+        return XDP_PASS;
 
-    // Записываем время начала события
-    data.start_time = bpf_ktime_get_ns();
+    struct udphdr *udp = (void *)(ip + 1);
+    if ((void *)(udp + 1) > data_end)
+        return XDP_DROP;
 
-    // Отправляем данные в пользовательское пространство
-    bpf_perf_event_output(ctx, &perf_map, BPF_F_CURRENT_CPU, &data, sizeof(data));
+    bpf_printk("UDP src port: %d, dest port: %d\n",
+               __constant_ntohs(udp->source), __constant_ntohs(udp->dest));
 
-    return 0;
+    return XDP_PASS;
 }
 
-SEC("tracepoint/syscalls/sys_exit_execve")
-int bpf_prog_end(struct pt_regs *ctx) {
-    struct data_t data = {};
-
-    // Получаем PID и имя процесса
-    data.pid = bpf_get_current_pid_tgid() >> 32;
-    bpf_get_current_comm(data.comm, sizeof(data.comm));
-
-    // Записываем время окончания события
-    data.end_time = bpf_ktime_get_ns();
-
-    // Отправляем данные в пользовательское пространство
-    bpf_perf_event_output(ctx, &perf_map, BPF_F_CURRENT_CPU, &data, sizeof(data));
-
-    return 0;
-}
-
-// Лицензия для eBPF программы
 char _license[] SEC("license") = "GPL";
+
+
 	
 
 
