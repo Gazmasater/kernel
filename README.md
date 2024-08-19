@@ -16,6 +16,10 @@ sudo sysctl -a | grep kernel.unprivileged_bpf_disabled
 
 kernel.unprivileged_bpf_disabled = 0
 
+Поменять на 0 kernel.unprivileged_bpf_disabled
+
+sudo nano /etc/sysctl.conf
+
 Проверка прав
 
 ls -ld /sys/fs/bpf
