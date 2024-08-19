@@ -1,3 +1,15 @@
+Должно быть установлено
+
+clang --version
+
+llvm-config --version
+
+pkg-config --modversion libelf
+
+bpftool --version
+
+
+
 sudo sysctl -a | grep kernel.unprivileged_bpf_disabled 
 
 должны увидеть:
