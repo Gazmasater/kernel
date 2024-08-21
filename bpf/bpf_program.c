@@ -8,13 +8,15 @@
 typedef int u32;
 
 // Определяем карту типа PERF_EVENT_ARRAY для передачи данных в пространство пользователя
-struct {
+struct
+{
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
     __uint(max_entries, 0);
 } perf_map SEC(".maps");
 
 // Структура для передачи данных в пространство пользователя
-struct data_t {
+struct data_t
+{
     u32 pid;
     char comm[TASK_COMM_LEN]; // TASK_COMM_LEN определено как 16 символов
 };
@@ -39,8 +41,3 @@ int bpf_prog(struct pt_regs *ctx)
 
 // Лицензия
 char _license[] SEC("license") = "GPL";
-
-	
-
-
-	
