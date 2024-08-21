@@ -5,7 +5,8 @@
 typedef int u32;
 
 // Определяем карту типа HASH
-struct {
+struct
+{
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 1);
     __type(key, u32);
@@ -13,13 +14,15 @@ struct {
 } my_map SEC(".maps");
 
 // Определяем карту типа PERF_EVENT_ARRAY
-struct {
+struct
+{
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
     __uint(max_entries, 0); // Замените на количество CPU или более
 } perf_map SEC(".maps");
 
 // Структура для передачи данных в пользовательское пространство
-struct data_t {
+struct data_t
+{
     char message[64];
 };
 
